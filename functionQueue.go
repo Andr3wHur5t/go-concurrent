@@ -4,7 +4,7 @@ type FunctionQueue chan func()
 
 /*** Util ***/
 
-// Can replace this with Math.max, having this lets us have no dependencies
+// Can replace this with Math.max, having this lets us have no dependencies.
 func max(a, b int) int {
 	if a > b {
 		return a
