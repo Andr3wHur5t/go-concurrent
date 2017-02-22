@@ -20,24 +20,22 @@ func max(a, b int) int {
 
 // Maintains Rudimentary State About A Workers Task
 type Task struct {
-	action  func()
 	didExit chan bool
 }
 
 // Creates a task for the given function
-func NewTask(action func()) *Task {
+func NewTask() *Task {
 	lt := new(Task)
-	lt.action = action
 	lt.didExit = make(chan bool)
 	return lt
 }
 
 // Executes the task and reports the result
-func (t *Task) Run() {
+func (t *Task) Run(action func()) {
 	defer func() {
 		t.didExit <- true
 	}()
-	t.action()
+	action()
 }
 
 /*** Worker ***/
@@ -53,6 +51,7 @@ type Worker struct {
 func NewWorker(queue FunctionQueue) *Worker {
 	w := new(Worker)
 	w.isActive = abool.New()
+	w.currentTask = NewTask()
 	w.queue = queue
 	return w
 }
@@ -68,11 +67,9 @@ func (w *Worker) Start() {
 	// Poll for work on our own go routine
 	for w.isActive.IsSet() {
 		// Pickup Work From the Queue
-		w.currentTask = NewTask(<-w.queue)
-		go w.currentTask.Run()
+		go w.currentTask.Run(<-w.queue)
 		// When We Report Exit Finish The Cycle and clean up
 		<-w.currentTask.didExit
-		w.currentTask = nil
 	}
 }
 
