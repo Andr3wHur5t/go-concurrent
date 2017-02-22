@@ -1,65 +1,46 @@
 package concurrent
 
-// Can replace this with Math.max, having this lets us have no dependencies.
-func max(a, b int) int {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
-}
-
-
 type ConcurrentFunctionQueue struct {
 	// Functions that are pushed here will be executed by the workers
-	queue FunctionQueue
+	Queue FunctionQueue
 
 	// Reference to our worker configuration
-	workers []*Worker
+	Workers []*Worker
 }
 
-// Removes Existing Workers to meet the given count
-func (q *ConcurrentFunctionQueue) reduceWorkers(workerCount int) {
-	for i := len(q.workers) - 1; i >= workerCount; i-- {
-		if q.workers[i] != nil {
-			q.workers[i].Stop()
-			q.workers[i] = nil
-		}
-	}
-
-	q.workers = q.workers[:workerCount]
-}
-
-// Creates New Workers to meet the given count
-func (q *ConcurrentFunctionQueue) spawnWorkers(workerCount int) {
-	originalWorkerCount := len(q.workers)
-	// Resize Workers Reference
-	oldWorkers := q.workers
-	q.workers = make([]*Worker, workerCount)
-	copy(q.workers, oldWorkers)
+// Creates new Workers to meet the given count
+func (q *ConcurrentFunctionQueue) spawnWorkers(workerCount uint32) {
+	q.Workers = make([]*Worker, workerCount)
 
 	// Create And Start Workers
-	for i := max(0, originalWorkerCount-1); i < workerCount; i++ {
-		q.workers[i] = NewWorker(q.queue)
-		go q.workers[i].Start()
+	for i := (uint32)(0); i < workerCount; i++ {
+		q.Workers[i] = NewWorker(q.Queue)
+		go q.Workers[i].Start()
 	}
 }
 
-// Adds or removes workers to meet the given count
-func (q *ConcurrentFunctionQueue) SetWorkerCount(workerCount int) {
-	if len(q.workers) == workerCount {
-		return
+// Starts our existing stopped workers
+func (q *ConcurrentFunctionQueue) Start() {
+	// Start Our Stopped Workers
+	for _, worker := range q.Workers {
+		if worker.isActive.Get() {
+			continue
+		}
+		go worker.Start()
 	}
-	if len(q.workers) > workerCount {
-		q.reduceWorkers(workerCount)
-	} else {
-		q.spawnWorkers(workerCount)
+}
+
+// Stops All Workers
+func (q *ConcurrentFunctionQueue) Stop() {
+	for _, worker := range q.Workers {
+		worker.Stop()
 	}
 }
 
 // Creates A New Concurrent Function Queue with the max queue size as configured
-func NewFunctionQueue(maxQueueSize uint32) *ConcurrentFunctionQueue {
+func NewFunctionQueue(workerCount, maxQueueSize uint32) *ConcurrentFunctionQueue {
 	q := new(ConcurrentFunctionQueue)
-	q.queue = make(FunctionQueue, maxQueueSize)
+	q.Queue = make(FunctionQueue, maxQueueSize)
+	q.spawnWorkers(workerCount)
 	return q
 }

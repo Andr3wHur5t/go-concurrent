@@ -9,26 +9,17 @@ import (
 /** High Level Interface **/
 
 func TestBasicConcurrentQueueAfterAdd(t *testing.T) {
-	concurrentTest := NewFunctionQueue(20) // Queue With 20 max queue entries
-	assert.Equal(t, len(concurrentTest.workers), 0, "Should not start with workers")
+	concurrentTest := NewFunctionQueue(45, 20) // Queue With 20 max queue entries, and 45 workers
+	assert.Equal(t, len(concurrentTest.Workers), 45, "Should start with correct number of workers")
 
-	concurrentTest.SetWorkerCount(10)
-	assert.Equal(t, len(concurrentTest.workers), 10, "Should be able to add workers")
-
-	concurrentTest.SetWorkerCount(2)
-	assert.Equal(t, len(concurrentTest.workers), 2, "Should be able to remove workers")
-
-	concurrentTest.SetWorkerCount(125)
-	assert.Equal(t, len(concurrentTest.workers), 125, "Should be able to add more workers")
-
-	for _, o := range concurrentTest.workers {
+	for _, o := range concurrentTest.Workers {
 		assert.Equal(t, o.isActive.Get(), true, "All workers should be active")
 	}
 
 	// We are putting a function on the queue to execute and opening channel to verify that execution completes.
 	executionProof := make(chan bool)
 	for i := 0; i <= 200; i++ {
-		concurrentTest.queue <- func() {
+		concurrentTest.Queue <- func() {
 			executionProof <- true
 		}
 		assert.Equal(t, <-executionProof, true, "Should execute function that was put on queue")
@@ -36,38 +27,26 @@ func TestBasicConcurrentQueueAfterAdd(t *testing.T) {
 }
 
 func TestBasicConcurrentQueueAfterSubtract(t *testing.T) {
-	concurrentTest := NewFunctionQueue(20) // Queue With 20 max queue entries
-	assert.Equal(t, len(concurrentTest.workers), 0, "Should not start with workers")
+	concurrentTest := NewFunctionQueue(4, 20) // Queue With 20 max queue entries, and 4 workers
+	assert.Equal(t, len(concurrentTest.Workers), 4, "Should start with correct number of workers")
 
-	concurrentTest.SetWorkerCount(10)
-	assert.Equal(t, len(concurrentTest.workers), 10, "Should be able to add workers")
-
-	concurrentTest.SetWorkerCount(2)
-	assert.Equal(t, len(concurrentTest.workers), 2, "Should be able to remove workers")
-
-	concurrentTest.SetWorkerCount(125)
-	assert.Equal(t, len(concurrentTest.workers), 125, "Should be able to add more workers")
-
-	concurrentTest.SetWorkerCount(4)
-	assert.Equal(t, len(concurrentTest.workers), 4, "Should be able to remove workers")
-
-	for _, o := range concurrentTest.workers {
+	for _, o := range concurrentTest.Workers {
 		assert.Equal(t, o.isActive.Get(), true, "All workers should be active")
 	}
 
 	// We are putting a function on the queue to execute and opening channel to verify that execution completes.
 	executionProof := make(chan bool)
 	for i := 0; i <= 200; i++ {
-		concurrentTest.queue <- func() {
+		concurrentTest.Queue <- func() {
 			executionProof <- true
 		}
 		assert.Equal(t, <-executionProof, true, "Should execute function that was put on queue")
 	}
 }
 
-func _benchmarkExeCommon(workerCount int, b *testing.B) {
-	concurrentTest := NewFunctionQueue(uint32(b.N) + 1)
-	concurrentTest.SetWorkerCount(workerCount)
+func _benchmarkExeCommon(workerCount uint32, b *testing.B) {
+	// Spawn the number of workers to test, and make queue long enough to hold all bench entries
+	concurrentTest := NewFunctionQueue(workerCount, uint32(b.N) + 1)
 
 	var a float64
 	loadFunc := func() {
@@ -82,9 +61,9 @@ func _benchmarkExeCommon(workerCount int, b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i <= b.N; i++ {
 		if i == b.N {
-			concurrentTest.queue <- compFunc
+			concurrentTest.Queue <- compFunc
 		} else {
-			concurrentTest.queue <- loadFunc
+			concurrentTest.Queue <- loadFunc
 		}
 	}
 
