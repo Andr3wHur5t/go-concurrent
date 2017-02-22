@@ -22,7 +22,7 @@ func TestBasicConcurrentQueueAfterAdd(t *testing.T) {
 	assert.Equal(t, len(concurrentTest.workers), 125, "Should be able to add more workers")
 
 	for _, o := range concurrentTest.workers {
-		assert.Equal(t, o.isActive, true, "All workers should be active")
+		assert.Equal(t, o.isActive.IsSet(), true, "All workers should be active")
 	}
 
 	// We are putting a function on the queue to execute and opening channel to verify that execution completes.
@@ -52,7 +52,7 @@ func TestBasicConcurrentQueueAfterSubtract(t *testing.T) {
 	assert.Equal(t, len(concurrentTest.workers), 4, "Should be able to remove workers")
 
 	for _, o := range concurrentTest.workers {
-		assert.Equal(t, o.isActive, true, "All workers should be active")
+		assert.Equal(t, o.isActive.IsSet(), true, "All workers should be active")
 	}
 
 	// We are putting a function on the queue to execute and opening channel to verify that execution completes.
@@ -66,6 +66,7 @@ func TestBasicConcurrentQueueAfterSubtract(t *testing.T) {
 }
 
 func _benchmarkExeCommon(workerCount int, b *testing.B) {
+
 	concurrentTest := NewFunctionQueue(uint32(b.N) + 1)
 	concurrentTest.SetWorkerCount(workerCount)
 
@@ -79,6 +80,7 @@ func _benchmarkExeCommon(workerCount int, b *testing.B) {
 		didComplete <- true
 	}
 
+	b.ReportAllocs()
 	for i := 0; i <= b.N; i++ {
 		if i == b.N {
 			concurrentTest.queue <- compFunc

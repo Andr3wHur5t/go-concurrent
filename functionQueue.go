@@ -1,5 +1,7 @@
 package concurrent
 
+import "github.com/tevino/abool"
+
 type FunctionQueue chan func()
 
 /*** Util ***/
@@ -12,6 +14,7 @@ func max(a, b int) int {
 		return b
 	}
 }
+
 
 /*** Worker Task ***/
 
@@ -42,37 +45,35 @@ func (t *Task) Run() {
 // Listens on a queue and executes tasks
 type Worker struct {
 	queue       FunctionQueue
-	isActive    bool
+	isActive    *abool.AtomicBool
 	currentTask *Task
 }
 
 // Creates a worker which will execute tasks on the given function queue
 func NewWorker(queue FunctionQueue) *Worker {
 	w := new(Worker)
-	w.isActive = true
+	w.isActive = abool.New()
 	w.queue = queue
 	return w
 }
-
 // Stops the worker from executing new tasks on the function queue
 func (w *Worker) Stop() {
-	w.isActive = false
+	w.isActive.SetTo(false)
 }
 
 // Starts the worker on the function queue
 func (w *Worker) Start() {
-	w.isActive = true
+	w.isActive.SetTo(true)
+
 	// Poll for work on our own go routine
-	go func() {
-		for w.isActive {
-			// Pickup Work From the Queue
-			w.currentTask = NewTask(<-w.queue)
-			go w.currentTask.Run()
-			// When We Report Exit Finish The Cycle and clean up
-			<-w.currentTask.didExit
-			w.currentTask = nil
-		}
-	}()
+	for w.isActive.IsSet() {
+		// Pickup Work From the Queue
+		w.currentTask = NewTask(<-w.queue)
+		go w.currentTask.Run()
+		// When We Report Exit Finish The Cycle and clean up
+		<-w.currentTask.didExit
+		w.currentTask = nil
+	}
 }
 
 /*** Concurrent Function Queue ***/
@@ -108,7 +109,7 @@ func (q *ConcurrentFunctionQueue) spawnWorkers(workerCount int) {
 	// Create And Start Workers
 	for i := max(0, originalWorkerCount-1); i < workerCount; i++ {
 		q.workers[i] = NewWorker(q.queue)
-		q.workers[i].Start()
+		go q.workers[i].Start()
 	}
 }
 
